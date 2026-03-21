@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "layerwise"
+version = "0.1.0"
+description = "LayerWise scaffolding for a decoupled ML engine, FastAPI backend, and React frontend."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "LayerWise Team" }]
+dependencies = []
+
+[project.scripts]
+layerwise-analyze-dataset = "scripts.analyze_dataset:main"
+layerwise-detect-domain = "scripts.detect_domain:main"
+layerwise-recommend-model = "scripts.recommend_model:main"
+layerwise-generate-freeze = "scripts.generate_freeze:main"
+layerwise-recommend-hyperparams = "scripts.recommend_hyperparams:main"
+layerwise-explain = "scripts.explain:main"
+layerwise-run-pipeline = "scripts.run_pipeline:main"
+layerwise-generate-fixtures = "scripts.generate_fixtures:main"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+

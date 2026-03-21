@@ -1,0 +1,5 @@
+# Production dependencies will be added incrementally by milestone.
+fastapi
+uvicorn
+pydantic
+

@@ -1,0 +1,2 @@
+"""Report router placeholder."""
+
