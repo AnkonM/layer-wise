@@ -24,7 +24,10 @@ layerwise-generate-fixtures = "scripts.generate_fixtures:main"
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = [
+    "-ra",
+    "--basetemp=./.pytest_tmp"
+    ]
 pythonpath = ["."]
 
 [tool.ruff]
