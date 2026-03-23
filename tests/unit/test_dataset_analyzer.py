@@ -184,3 +184,15 @@ def test_all_corrupted_images(tmp_path, analyzer):
 def test_missing_dataset_path(analyzer):
     with pytest.raises(RuntimeError):
         analyzer.analyze("path-that-does-not-exist")
+
+#13. Test large dataset
+def test_large_dataset_does_not_crash(tmp_path, analyzer):
+    cls_dir = tmp_path / "data"
+    cls_dir.mkdir()
+
+    for i in range(200):
+        create_image(cls_dir / f"{i}.jpg")
+
+    profile = analyzer.analyze(str(tmp_path))
+
+    assert profile.total_samples == 200

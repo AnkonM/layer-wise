@@ -5,3 +5,4 @@ pydantic
 pillow==12.1.1
 numpy==2.4.3
 mypy
+typer==0.24.1
