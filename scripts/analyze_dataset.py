@@ -47,6 +47,7 @@ def analyze(
     output: Optional[str] = typer.Option(
         None, "--output", "-o", help="Optional path to save JSON output"
     ),
+    debug: Optional[bool] = typer.Option(False, "--debug", "-d"),
 ):
     dataset_path = Path(path)
 
@@ -80,7 +81,7 @@ def analyze(
         typer.secho("Failed to analyze dataset", fg=typer.colors.RED)
         typer.secho(f"Error: {str(e)}", fg=typer.colors.YELLOW)
 
-        if typer.get_app_dir("layerwise"):
+        if debug:
             typer.secho(f"\nDebug: {repr(e)}", fg = typer.colors.BLACK)
 
         raise typer.Exit(code=1)
