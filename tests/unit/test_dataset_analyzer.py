@@ -1,5 +1,6 @@
 import pytest
 from PIL import Image
+import time
 
 from engine.analyzer.dataset_analyzer import DatasetAnalyzer
 
@@ -186,13 +187,19 @@ def test_missing_dataset_path(analyzer):
         analyzer.analyze("path-that-does-not-exist")
 
 #13. Test large dataset
-def test_large_dataset_does_not_crash(tmp_path, analyzer):
+def test_large_dataset(tmp_path, analyzer):
     cls_dir = tmp_path / "data"
     cls_dir.mkdir()
 
-    for i in range(200):
+    for i in range(500):
         create_image(cls_dir / f"{i}.jpg")
 
+    start = time.perf_counter()
+    
     profile = analyzer.analyze(str(tmp_path))
+    
+    end = time.perf_counter()
+    elapsed = end - start
 
-    assert profile.total_samples == 200
+    assert profile.total_samples == 500
+    assert elapsed <= 5.0
