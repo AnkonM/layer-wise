@@ -52,10 +52,10 @@ def analyze(
 
     # Input Validation
     if not dataset_path.exists():
-        if not dataset_path.is_dir():
-            typer.secho(f"Path is not a valid directory: {dataset_path}", fg=typer.colors.RED)
-            typer.Exit(code=1)
         typer.secho(f"Path does not exist: {dataset_path}", fg=typer.colors.RED) 
+        typer.Exit(code=1)
+    elif not dataset_path.is_dir():
+        typer.secho(f"Path is not a valid directory: {dataset_path}", fg=typer.colors.RED)
         typer.Exit(code=1)
 
 
@@ -91,4 +91,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
