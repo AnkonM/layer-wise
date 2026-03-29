@@ -19,6 +19,16 @@ class DatasetProfile:
     pixel_mean: List[float]
     pixel_std: List[float]
 
+    # Aspect ratio (D2)
+    aspect_ratio_median: float
+    aspect_ratio_std: float
+
+    # Color diversity (D4)
+    color_diversity: float
+
+    # Resolution consistency (D5)
+    resolution_std: float
+
     estimated_mb: float
 
     corrupted_files: List[str] = field(default_factory=list)
