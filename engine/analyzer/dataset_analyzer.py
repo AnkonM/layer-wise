@@ -80,6 +80,7 @@ class DatasetAnalyzer:
 
         sizes = []
         pixels = []
+        entropies = []
         grayscale_count = 0
         total_bytes = 0
 
@@ -92,6 +93,13 @@ class DatasetAnalyzer:
                     sizes.append(img.size)
                     pixels.append(arr.reshape(-1, 3))
 
+                    # color diversity
+                    hist = np.histogram((arr*255.0).flatten(), bins=256, range=(0, 256))[0]
+                    prob = hist / np.sum(hist)
+                    prob = prob[prob > 0]
+                    entropy = -np.sum(prob * np.log2(prob))
+                    entropies.append(entropy)
+                    
                     if self._detect_grayscale(arr):
                         grayscale_count += 1
 
@@ -105,12 +113,24 @@ class DatasetAnalyzer:
         std = pixels.std(axis=0).tolist()
 
         sizes_np = np.array(sizes)
-        median_size = tuple(np.median(sizes_np, axis=0).astype(int))
+
+        widths = sizes_np[:, 0]
+        heights = sizes_np[:, 1]
+        median_size = (
+            int(np.median(widths)),
+            int(np.median(heights))
+        )
         size_variance = float(np.std(sizes_np))
 
-        aspect_ratios = sizes_np[:, 0] / sizes_np[:, 1]
+        width_std = float(np.std(widths))
+        height_std = float(np.std(heights))
+        resolution_std = (width_std + height_std) / 2
+
+        aspect_ratios = widths / heights
         aspect_ratio_median = float(np.median(aspect_ratios))
         aspect_ratio_std = float(np.std(aspect_ratios))
+
+        color_diversity = np.mean(entropies) if entropies else 0.0
 
         grayscale_ratio = grayscale_count / len(sampled)
 
@@ -125,6 +145,8 @@ class DatasetAnalyzer:
             "estimated_mb": estimated_mb,
             "aspect_ratio_median": aspect_ratio_median,
             "aspect_ratio_std": aspect_ratio_std,
+            "color_diversity": color_diversity,
+            "resolution_std": resolution_std,
         }
 
     def _detect_grayscale(self, arr: np.ndarray) -> bool:
