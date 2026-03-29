@@ -108,6 +108,10 @@ class DatasetAnalyzer:
         median_size = tuple(np.median(sizes_np, axis=0).astype(int))
         size_variance = float(np.std(sizes_np))
 
+        aspect_ratios = sizes_np[:, 0] / sizes_np[:, 1]
+        aspect_ratio_median = float(np.median(aspect_ratios))
+        aspect_ratio_std = float(np.std(aspect_ratios))
+
         grayscale_ratio = grayscale_count / len(sampled)
 
         estimated_mb = total_bytes / (1024 * 1024)
@@ -119,6 +123,8 @@ class DatasetAnalyzer:
             "pixel_mean": mean,
             "pixel_std": std,
             "estimated_mb": estimated_mb,
+            "aspect_ratio_median": aspect_ratio_median,
+            "aspect_ratio_std": aspect_ratio_std,
         }
 
     def _detect_grayscale(self, arr: np.ndarray) -> bool:
