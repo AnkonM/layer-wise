@@ -1,11 +1,11 @@
-from dataclasses import dataclass   
+from dataclasses import dataclass, field   
 from enum import Enum
 from typing import List, Optional
 
 class Domain(str, Enum):
-    NATURAL_IMAGES = "Natural Images"
-    MEDICAL_IMAGES = "Medical Images"
-    SATELLITE_IMAGES = "Satellite Images"
+    NATURAL = "NATURAL"
+    MEDICAL = "MEDICAL"
+    SATELLITE = "SATELLITE"
     DOCUMENT = "DOCUMENT"
     MICROSCOPY = "MICROSCOPY"
     UNKNOWN = "UNKNOWN"
@@ -14,5 +14,5 @@ class Domain(str, Enum):
 class DomainResults:
     domain: Domain
     confidence: float
-    signals: List[str]
+    signals: List[str] = field(default_factory=list)
     alternative: Optional[Domain] = None
