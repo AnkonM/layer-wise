@@ -54,6 +54,7 @@ class DomainDetector:
             signals.append(
                 f"D1 HIT: Grayscale ratio={gs:.3f} > {_GRAYSCALE_VERY_HIGH}"
             )
+
         elif gs >= _GRAYSCALE_HIGH:
             scores[Domain.MEDICAL] += 2.0
             scores[Domain.DOCUMENT] += 1.0
@@ -61,6 +62,7 @@ class DomainDetector:
             signals.append(
                 f"D1 HIT: Grayscale ratio={gs:.3f} > {_GRAYSCALE_HIGH}"
             )
+
         elif gs < _GRAYSCALE_LOW:
             scores[Domain.NATURAL] += 2.0
             scores[Domain.SATELLITE] += 1.0
@@ -68,40 +70,166 @@ class DomainDetector:
                 f"D1 HIT: Grayscale ratio={gs:.3f} < {_GRAYSCALE_LOW}"
             )
 
-def _d2_aspect_ratio(
-    self,
-    profile: DatasetProfile,
-    scores: dict[Domain, float],
-    signals: list[str]
-) -> None:
+        else:
+            signals.append(
+                f"D1 MISS: Grayscale ratio={gs:.3f}"
+            )
 
-    median = profile.aspect_ratio_median
-    std = profile.aspect_ratio_std
+    def _d2_aspect_ratio(
+        self,
+        profile: DatasetProfile,
+        scores: dict[Domain, float],
+        signals: list[str]
+    ) -> None:
 
-    if 0.9 <= median <= 1.1 and std < 0.15:
-        scores[Domain.MEDICAL] += 2.0
-        scores[Domain.MICROSCOPY] += 2.0
-        signals.append(
-            f"D2 HIT: Aspect ratio median={median:.3f} near 1.0 and size variance={std:.3f} small"
-        )
-    
-    if median > 2.5 or (1/median) > 2.5:
-        scores[Domain.DOCUMENT] += 2.0
-        signals.append(
-            f"D2 HIT: Aspect ratio median={median:.3f} implying tall/narrow images"
-        )
-    
-    w_over_h = 1.0 / median if median < 1.0 else median
-    if 1.3 <= w_over_h <= 2.0 and std < 0.25:
-        scores[Domain.SATELLITE] += 1.0
-        signals.append(
-            f"D2 HIT: Aspect ratio median={median:.3f} "
-        )
+        median = profile.aspect_ratio_median
+        std = profile.aspect_ratio_std
+        w_over_h = 1.0 / median if median < 1.0 else median
 
-    if std > 0.4:
-        scores[Domain.NATURAL] += 1
-        signals.append(
-            f"D2 HIT: High aspect ratio std={std:.3f} implies organic/ unsanitised images"
-        )
-    
-    return None
+        if 0.9 <= median <= 1.1 and std < 0.15:
+            scores[Domain.MEDICAL] += 2.0
+            scores[Domain.MICROSCOPY] += 2.0
+            signals.append(
+                f"D2 HIT: Aspect ratio median={median:.3f} near 1.0 and size variance={std:.3f} small"
+            )
+        
+        elif median > 2.5 or (1/median) > 2.5:
+            scores[Domain.DOCUMENT] += 2.0
+            signals.append(
+                f"D2 HIT: Aspect ratio median={median:.3f} implying tall/narrow images"
+            )
+        
+        elif 1.3 <= w_over_h <= 2.0 and std < 0.25:
+            scores[Domain.SATELLITE] += 1.0
+            signals.append(
+                f"D2 HIT: Aspect ratio median={median:.3f} "
+            )
+
+        elif std > 0.4:
+            scores[Domain.NATURAL] += 1
+            signals.append(
+                f"D2 HIT: High aspect ratio std={std:.3f} implies organic/ unsanitised images"
+            )
+        
+        else:
+            signals.append(
+                f"D2 MISS: Aspect ratio median={median:.3f} and std={std:.3f}"
+            )
+
+    def _d3_intensity(
+        self,
+        profile: DatasetProfile,
+        scores: dict[Domain, float],
+        signals: list[str]
+    ) -> None:
+        # Luminance proxy: standart ITU-R BT.601 (r, g, b)
+        if len(profile.pixel_mean) == 3:
+            r, g, b = profile.pixel_mean
+            lum_mean = 0.299 * r + 0.587 * g + 0.114 * b
+            r_std, g_std, b_std = profile.pixel_std
+            lum_std = 0.299 * r_std + 0.587 * g_std + 0.114 * b_std
+            # Inter-channel spread: how different are the channel means?
+            channel_spread = max(profile.pixel_mean) - min(profile.pixel_mean)
+        else:
+            # for grayscale images
+            lum_mean = profile.pixel_mean[0]
+            lum_std = profile.pixel_std[0]
+            channel_spread = 0.0
+
+        if lum_mean < 0.3:
+            if lum_std < 0.15:
+                scores[Domain.MEDICAL] += 2.0
+                signals.append(
+                    f"D3 HIT: Low luminance mean={lum_mean:.3f} and std={lum_std:.3f}"
+                )
+            elif lum_std >= 0.2:
+                scores[Domain.MICROSCOPY] += 1.0
+                signals.append(
+                    f"D3 HIT: Low luminance mean={lum_mean:.3f} and high std={lum_std:.3f}"
+                )
+
+        elif lum_mean > 0.7:
+            scores[Domain.DOCUMENT] += 2.0
+            signals.append(
+                f"D3 HIT: High luminance mean={lum_mean:.3f}"
+            )
+
+        elif 0.35 <= lum_mean <= 0.60 and channel_spread > 0.05:
+            scores[Domain.NATURAL] += 1.0
+            signals.append(
+                f"D3 HIT: Medium luminance mean={lum_mean:.3f}"
+            )
+
+        else:
+            signals.append(
+                f"D3 MISS: Luminance mean={lum_mean:.3f} and std={lum_std:.3f}"
+            )
+
+    def _d4_color_diversity(
+        self,
+        profile: DatasetProfile,
+        scores: dict[Domain, float],
+        signals: list[str]
+    ) -> None:
+        
+        cd = profile.color_diversity
+
+        if cd < 0.05:
+            scores[Domain.MEDICAL] += 2.0
+            scores[Domain.DOCUMENT] += 2.0
+            signals.append(
+                f"D4 HIT: Low color diversity={cd:.3f}"
+            )
+
+        elif 0.05 <= cd < 0.12:
+            scores[Domain.SATELLITE] += 1.0
+            signals.append(
+                f"D4 HIT: Medium color diversity={cd:.3f}"
+            )
+
+        elif cd >= 0.18:
+            scores[Domain.NATURAL] += 2.0
+            signals.append(
+                f"D4 HIT: High color diversity={cd:.3f}"
+            )
+
+        else:
+            signals.append(
+                f"D4 MISS: Color diversity={cd:.3f}"
+            )
+
+    def _d5_resolution_consistency(
+        self,
+        profile: DatasetProfile,
+        scores: dict[Domain, float],
+        signals: list[str]
+    ) -> None:
+        
+        res_std = profile.resolution_std
+        h, w = profile.median_image_size
+        min_dim = min(h, w)
+        gs = profile.grayscale_ratio
+
+        if res_std < 0.05:
+            scores[Domain.MEDICAL] += 1
+            scores[Domain.DOCUMENT] += 1
+            signals.append(
+                f"D5 HIT: Low resolution std={res_std:.3f}"
+            )
+
+        elif res_std < 0.1 and min_dim > 512:
+            scores[Domain.SATELLITE] += 1
+            signals.append(
+                f"D5 HIT: High resolution std={min_dim}"
+            )
+
+        elif res_std > 0.5 and gs < 0.3:
+            scores[Domain.NATURAL] += 1.0
+            signals.append(
+                f"D5 HIT: High resolution std={res_std:.3f}"
+            )
+            
+        else:
+            signals.append(
+                f"D5 MISS: Resolution std={res_std:.3f}"
+            )
