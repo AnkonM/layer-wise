@@ -11,7 +11,7 @@ class Domain(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 @dataclass
-class DomainResults:
+class DomainResult:
     domain: Domain
     confidence: float
     signals: List[str] = field(default_factory=list)
