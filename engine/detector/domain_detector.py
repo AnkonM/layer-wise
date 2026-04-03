@@ -1,16 +1,20 @@
-from engine.models.domain import Domain, DomainResults
+from engine.models.domain import Domain, DomainResult
 from engine.models.dataset import DatasetProfile
 
-# Threshold constants
 # D1
 _GRAYSCALE_LOW = 0.2
 _GRAYSCALE_HIGH = 0.7
 _GRAYSCALE_VERY_HIGH = 0.9
 
-
+def _confidence_score(scores: dict) -> float:
+    sorted_scores = sorted(scores.values(), reverse = True)
+    top = sorted_scores[0]
+    second = sorted_scores[1] if len(sorted_scores) > 1 else 0
+    gap = top - second
+    return round(min(0.5 + gap * 0.1, 0.95), 2)
 
 class DomainDetector:
-    def detect(self, profile: any) -> DomainResults:
+    def detect(self, profile: DatasetProfile) -> DomainResult:
         
         if not isinstance(profile, DatasetProfile):
             raise TypeError(
@@ -27,6 +31,34 @@ class DomainDetector:
 
         # Apply rules in order
         self._d1_grayscale(profile, scores, signals)
+        self._d2_aspect_ratio(profile, scores, signals)
+        self._d3_intensity(profile, scores, signals)
+        self._d4_color_diversity(profile, scores, signals)
+        self._d5_resolution_consistency(profile, scores, signals)
+
+        sorted_domains = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        top_domain,    top_score    = sorted_domains[0]
+        second_domain, second_score = sorted_domains[1]
+        gap = top_score - second_score
+
+        if top_score < 2:
+            return DomainResult(
+                domain=Domain.UNKNOWN,
+                confidence=0.35,
+                signals=signals,
+                alternative=top_domain
+            )
+        
+        confidence = _confidence_score(scores)
+        alternative = second_domain if gap <= 1 else None
+
+        return DomainResult(
+            domain=top_domain,
+            confidence=confidence,
+            signals=signals,
+            alternative=alternative
+        )
+
         
 
     def _d1_grayscale(
@@ -84,7 +116,7 @@ class DomainDetector:
 
         median = profile.aspect_ratio_median
         std = profile.aspect_ratio_std
-        w_over_h = 1.0 / median if median < 1.0 else median
+        w_over_h = 0.0 if median == 0 else 1.0 / median if median < 1.0 else median
 
         if 0.9 <= median <= 1.1 and std < 0.15:
             scores[Domain.MEDICAL] += 2.0
@@ -128,21 +160,29 @@ class DomainDetector:
             lum_mean = 0.299 * r + 0.587 * g + 0.114 * b
             r_std, g_std, b_std = profile.pixel_std
             lum_std = 0.299 * r_std + 0.587 * g_std + 0.114 * b_std
+            # Alternate lum_std measure
+            # lum_std = np.sqrt(0.299 * r_std**2 + 0.587 * g_std**2 + 0.114 * b_std**2)
+
             # Inter-channel spread: how different are the channel means?
             channel_spread = max(profile.pixel_mean) - min(profile.pixel_mean)
         else:
             # for grayscale images
             lum_mean = profile.pixel_mean[0]
-            lum_std = profile.pixel_std[0]
+            lum_std = profile.pixel_std[0] if profile.pixel_std else 0.0
             channel_spread = 0.0
 
-        if lum_mean < 0.3:
-            if lum_std < 0.15:
+        if lum_mean < 0.35:
+            if not lum_std:
+                signals.append(
+                    f"D3 MISS: Empty profile.pixel_std: {profile.pixel_std}"
+                )
+                return
+            if lum_std <= 0.2:
                 scores[Domain.MEDICAL] += 2.0
                 signals.append(
                     f"D3 HIT: Low luminance mean={lum_mean:.3f} and std={lum_std:.3f}"
                 )
-            elif lum_std >= 0.2:
+            elif lum_std > 0.2:
                 scores[Domain.MICROSCOPY] += 1.0
                 signals.append(
                     f"D3 HIT: Low luminance mean={lum_mean:.3f} and high std={lum_std:.3f}"
@@ -154,7 +194,7 @@ class DomainDetector:
                 f"D3 HIT: High luminance mean={lum_mean:.3f}"
             )
 
-        elif 0.35 <= lum_mean <= 0.60 and channel_spread > 0.05:
+        elif 0.35 <= lum_mean <= 0.7 and channel_spread > 0.05:
             scores[Domain.NATURAL] += 1.0
             signals.append(
                 f"D3 HIT: Medium luminance mean={lum_mean:.3f}"
@@ -174,20 +214,20 @@ class DomainDetector:
         
         cd = profile.color_diversity
 
-        if cd < 0.05:
+        if cd < 5.0:
             scores[Domain.MEDICAL] += 2.0
-            scores[Domain.DOCUMENT] += 2.0
             signals.append(
                 f"D4 HIT: Low color diversity={cd:.3f}"
             )
 
-        elif 0.05 <= cd < 0.12:
+        elif 5.0 <= cd < 6.5:
+            scores[Domain.DOCUMENT] += 2.0
             scores[Domain.SATELLITE] += 1.0
             signals.append(
                 f"D4 HIT: Medium color diversity={cd:.3f}"
             )
 
-        elif cd >= 0.18:
+        elif cd >= 6.5:
             scores[Domain.NATURAL] += 2.0
             signals.append(
                 f"D4 HIT: High color diversity={cd:.3f}"
@@ -204,7 +244,7 @@ class DomainDetector:
         scores: dict[Domain, float],
         signals: list[str]
     ) -> None:
-        
+       
         res_std = profile.resolution_std
         h, w = profile.median_image_size
         min_dim = min(h, w)
@@ -220,7 +260,7 @@ class DomainDetector:
         elif res_std < 0.1 and min_dim > 512:
             scores[Domain.SATELLITE] += 1
             signals.append(
-                f"D5 HIT: High resolution std={min_dim}"
+                f"D5 HIT: High resolution (min_dim={min_dim}, std={res_std:.3f})"
             )
 
         elif res_std > 0.5 and gs < 0.3:
@@ -228,7 +268,7 @@ class DomainDetector:
             signals.append(
                 f"D5 HIT: High resolution std={res_std:.3f}"
             )
-            
+
         else:
             signals.append(
                 f"D5 MISS: Resolution std={res_std:.3f}"
